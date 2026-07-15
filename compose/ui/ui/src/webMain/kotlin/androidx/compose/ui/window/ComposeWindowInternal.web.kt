@@ -478,6 +478,16 @@ internal class ComposeWindow(
             // Move-based gestures (scroll, back gesture, pull-to-refresh) are NOT affected:
             // those are decided earlier, in the touchmove handler and by the canvas
             // touch-action style.
+            //
+            // Additionally, if this touch sequence requested the software keyboard (Compose
+            // handled the tap in the preceding pointerup and focused a backing input), the
+            // focus is re-asserted here: iOS Safari 26.3+ does not reliably summon the
+            // keyboard for a focus() issued during pointer-event dispatch, but does for one
+            // issued during the touchend dispatch of the same tap.
+            // See https://youtrack.jetbrains.com/issue/CMP-10079 and WebTextInputService.
+            (platformContext.textInputService as WebTextInputService)
+                .refocusBackingInputOnTouchEnd()
+
             if (lastPointerReleaseConsumed && evt.cancelable) {
                 evt.preventDefault()
             }
@@ -714,6 +724,8 @@ internal class ComposeWindow(
                 activeTouchPointersConsumedMoves.remove(event.pointerId)
                 activeTouchOffset = null
                 lastPointerReleaseConsumed = false
+                (platformContext.textInputService as WebTextInputService)
+                    .resetKeyboardShowRequest()
             } else {
                 actualActivePointerButtons = null
             }
@@ -766,6 +778,8 @@ internal class ComposeWindow(
             if (activeTouchPointers.isEmpty()) {
                 require(activeTouchPointersConsumedMoves.isEmpty())
                 rootScrollObserver.reset()
+                (platformContext.textInputService as WebTextInputService)
+                    .resetKeyboardShowRequest()
             }
 
             // iOS Safari doesn't request focus when the page is shown,

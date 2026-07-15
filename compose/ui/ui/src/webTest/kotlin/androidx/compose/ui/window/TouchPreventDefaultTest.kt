@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
@@ -105,6 +107,28 @@ class TouchPreventDefaultTest : OnCanvasTests {
         val strayTouchend = touchEvent("touchend")
         dispatchEvents(strayTouchend)
         assertFalse(strayTouchend.defaultPrevented, "stray touchend without fresh pointerup should not be prevented")
+    }
+
+    @Test
+    fun touchendPreventedOnTextFieldTap() = runApplicationTest {
+        createComposeWindow {
+            BasicTextField(
+                state = rememberTextFieldState("hello"),
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        dispatchEvents(
+            WebPointerEvent("pointerdown", touch(0, 50, 50)),
+            WebPointerEvent("pointerup", touch(0, 50, 50)),
+        )
+        val touchend = touchEvent("touchend")
+        dispatchEvents(touchend)
+
+        // Text field taps consume the release, so their touch defaults (compatibility mouse
+        // events, tap-commit) must be suppressed - on iOS Safari 26.3+ they would dismiss the
+        // virtual keyboard summoned by this very tap.
+        assertTrue(touchend.defaultPrevented, "touchend should be prevented when tapping a text field")
     }
 
     @Test

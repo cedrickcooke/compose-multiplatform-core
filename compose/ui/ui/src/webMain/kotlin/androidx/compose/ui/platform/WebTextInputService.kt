@@ -113,7 +113,49 @@ internal abstract class WebTextInputService :
         backingDomInput = null
     }
 
+    /**
+     * Whether the application requested to show the software keyboard (a text input session
+     * started or SoftwareKeyboardController.show() was called) and that request still awaits
+     * the end of the current touch sequence.
+     *
+     * On iOS Safari 26.3+ calling focus() on the backing input during the pointerup dispatch
+     * (where Compose processes the tap and starts the text input session) is not reliably
+     * honored as a keyboard summon anymore, while a focus() call issued during the touchend
+     * dispatch of the same tap is - which matches the pre-pointer-events-migration pipeline
+     * (Compose <= 1.10) that delivered taps to the scene from the touchend handler and did not
+     * exhibit this bug. See [refocusBackingInputOnTouchEnd].
+     *
+     * Deliberately NOT set by [updateState]-driven focus calls: text/selection sync must never
+     * re-summon a keyboard the user dismissed.
+     */
+    private var keyboardShowRequested = false
+
+    /**
+     * Drops a pending keyboard show request. Called when a new touch sequence starts (or is
+     * cancelled), so that a request latched by an earlier gesture or a programmatic
+     * show() can never make an unrelated later tap (e.g. on a button) re-summon the keyboard.
+     */
+    fun resetKeyboardShowRequest() {
+        keyboardShowRequested = false
+    }
+
+    /**
+     * Re-asserts the backing input's DOM focus. Must be called synchronously from the touchend
+     * listener, i.e. within a trusted touch event dispatch: on iOS Safari re-focusing the
+     * (possibly already focused) editable element there makes WebKit summon the virtual
+     * keyboard for the tap that requested it (the element-did-refocus path requires a user
+     * gesture). In browsers where the pointerup-time focus() already showed the keyboard this
+     * is a no-op. Only acts when a keyboard show was requested during the current touch
+     * sequence.
+     */
+    fun refocusBackingInputOnTouchEnd() {
+        if (!keyboardShowRequested) return
+        keyboardShowRequested = false
+        backingDomInput?.focus()
+    }
+
     override fun showSoftwareKeyboard() {
+        keyboardShowRequested = backingDomInput != null
         backingDomInput?.focus()
     }
 
