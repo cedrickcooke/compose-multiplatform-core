@@ -17,7 +17,7 @@
 package androidx.compose.ui.input
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +30,7 @@ import androidx.compose.ui.events.touchEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -116,7 +117,13 @@ class TouchKeyboardRefocusTest : OnCanvasTests {
     fun unrelatedTapDoesNotRefocusBackingInput() = runApplicationTest {
         createComposeWindow {
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.size(100.dp, 50.dp).background(Color.LightGray).clickable { })
+                // A tap-consuming, focus-neutral area: `clickable` is not used because on web
+                // it requests focus on click, which would end the text input session and make
+                // the assertions below vacuous.
+                Box(
+                    Modifier.size(100.dp, 50.dp).background(Color.LightGray)
+                        .pointerInput(Unit) { detectTapGestures { } }
+                )
                 BasicTextField(
                     state = rememberTextFieldState("hello"),
                     modifier = Modifier.size(100.dp, 50.dp)
@@ -131,8 +138,8 @@ class TouchKeyboardRefocusTest : OnCanvasTests {
 
         backingField.blur()
 
-        // Tap the unrelated clickable: its touchend must not re-focus the backing input
-        // (that would re-summon a keyboard the user dismissed).
+        // Tap the unrelated tap-consuming area: its touchend must not re-focus the backing
+        // input (that would re-summon a keyboard the user dismissed).
         tap(2, 50, 25)
 
         assertTrue(backingField.isConnected, "the text input session should still be active")
@@ -148,7 +155,10 @@ class TouchKeyboardRefocusTest : OnCanvasTests {
         val focusRequester = FocusRequester()
         createComposeWindow {
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.size(100.dp, 50.dp).background(Color.LightGray).clickable { })
+                Box(
+                    Modifier.size(100.dp, 50.dp).background(Color.LightGray)
+                        .pointerInput(Unit) { detectTapGestures { } }
+                )
                 BasicTextField(
                     state = rememberTextFieldState("hello"),
                     modifier = Modifier.size(100.dp, 50.dp).focusRequester(focusRequester)
@@ -165,7 +175,7 @@ class TouchKeyboardRefocusTest : OnCanvasTests {
         backingField.blur()
 
         // A new touch sequence must drop the stale request: the touchend of a tap on the
-        // unrelated clickable must not re-focus the backing input.
+        // unrelated tap-consuming area must not re-focus the backing input.
         tap(1, 50, 25)
 
         assertTrue(backingField.isConnected, "the text input session should still be active")
